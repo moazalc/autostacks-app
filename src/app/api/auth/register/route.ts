@@ -3,7 +3,7 @@ import { hash } from "bcrypt";
 import { PrismaClient } from "../../../../../generated/prisma";
 import { withAccelerate } from "@prisma/extension-accelerate";
 
-const prisma = new PrismaClient().$extends(withAccelerate()); 
+const prisma = new PrismaClient().$extends(withAccelerate());
 
 export async function POST(request: Request) {
   try {
@@ -15,7 +15,6 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-
 
     //Checking if user already exists
     const existingUser = await prisma.user.findFirst({
@@ -33,20 +32,44 @@ export async function POST(request: Request) {
 
     const hashedPassword = await hash(password, 10);
 
-    const newUser = await prisma.user.create({
-      data: {
-        email,
-        username,
-        password: hashedPassword,
-      },
+    const result = await prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          email,
+          username,
+          password: hashedPassword,
+        },
+      });
+
+      const newAccount = await tx.account.create({
+        data: {
+          name: `${username}'s Account`,
+        },
+      });
+
+      await tx.accountUser.create({
+        data: {
+          userId: newUser.id,
+          accountId: newAccount.id,
+        },
+      });
+
+      return {
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          username: newUser.username,
+        },
+        account: {
+          id: newAccount.id,
+          name: newAccount.name,
+        },
+      };
     });
+
     return NextResponse.json({
-      message: "User created successfully.",
-      user: {
-        id: newUser.id,
-        email: newUser.email,
-        username: newUser.username,
-      },
+      message: "User and account created successfully.",
+      ...result,
     });
   } catch (e) {
     console.error("Registration error:", e);

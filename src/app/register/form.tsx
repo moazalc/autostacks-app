@@ -4,7 +4,9 @@ import { FormEvent } from "react";
 export default function Form() {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const form = e.currentTarget;
     const formData = new FormData(e.currentTarget);
+
     const response = await fetch(`/api/auth/register`, {
       method: "POST",
       body: JSON.stringify({
@@ -13,7 +15,13 @@ export default function Form() {
         password: formData.get("password"),
       }),
     });
-    console.log({ response });
+    if (response.ok) {
+      alert("Registration Successful");
+      form.reset();
+    } else {
+      const error = await response.json();
+      alert(error.message || "Registration failed!");
+    }
   };
   return (
     <div>

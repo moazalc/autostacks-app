@@ -51,7 +51,10 @@ model Car {
   accountId String
   account   Account @relation(fields: [accountId], references: [id])
 
-  name      String
+  make      String
+  model     String
+  year      Int
+  imgUrl    String?
   buyPrice  Float
   buyDate   DateTime
   sellPrice Float?
@@ -69,7 +72,7 @@ model Entry {
   account   Account @relation(fields: [accountId], references: [id])
 
   amount       Float
-  type         EntryType // CREDIT (income), DEBIT (expense)
+  type         EntryType
   description  String?
   relatedCarId String?
   relatedCar   Car?      @relation(fields: [relatedCarId], references: [id])
