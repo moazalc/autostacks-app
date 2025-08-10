@@ -84,7 +84,7 @@ model Entry {
 
 model Balance {
   id        String  @id @default(uuid())
-  accountId String
+  accountId String  @unique
   account   Account @relation(fields: [accountId], references: [id])
 
   amount    Float
