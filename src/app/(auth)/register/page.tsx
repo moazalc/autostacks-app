@@ -1,5 +1,5 @@
-import Form from "./form";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import RegisterForm from "@/components/forms/RegisterForm";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 
@@ -10,5 +10,5 @@ export default async function RegisterPage() {
     // Redirect to dashboard if already logged in
     redirect("/dashboard");
   }
-  return <Form />;
+  return <RegisterForm />;
 }
