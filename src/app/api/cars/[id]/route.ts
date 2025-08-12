@@ -1,15 +1,30 @@
 import { PrismaClient } from "../../../../../generated/prisma";
 import { withAccelerate } from "@prisma/extension-accelerate";
 import { NextResponse } from "next/server";
+import { z } from "zod";
+import { carUpdateSchema } from "@/lib/validation";
 
 const prisma = new PrismaClient().$extends(withAccelerate());
 
-// Get a single car using ID
+// Validate the dynamic route param
+const idParamSchema = z.object({
+  id: z.uuid(),
+});
+
+// Get a single car
 export async function GET(
-  _: Request,
-  context: { params: Promise<{ id: string }> }
+  _req: Request,
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await context.params;
+  const parsed = idParamSchema.safeParse(params);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid car id", issues: parsed.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const { id } = parsed.data;
 
   try {
     const car = await prisma.car.findUnique({ where: { id } });
@@ -29,38 +44,34 @@ export async function GET(
 // Update a car
 export async function PUT(
   req: Request,
-  context: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await context.params;
+  const idParsed = idParamSchema.safeParse(params);
+  if (!idParsed.success) {
+    return NextResponse.json(
+      { error: "Invalid car id", issues: idParsed.error.issues },
+      { status: 400 }
+    );
+  }
+  const { id } = idParsed.data;
 
-  const {
-    make,
-    model,
-    year,
-    buyPrice,
-    buyDate,
-    imgUrl,
-    sellPrice,
-    sellDate,
-    notes,
-  } = await req.json();
+  const body = await req.json();
+  const parsed = carUpdateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { message: "Invalid body", issues: parsed.error.issues },
+      { status: 400 }
+    );
+  }
+
+  // Optional safety: don't allow moving a car to another account via update
+  const safeData = parsed.data;
 
   try {
     const updated = await prisma.car.update({
       where: { id },
-      data: {
-        make,
-        model,
-        year: year ? Number(year) : undefined,
-        buyPrice,
-        buyDate: buyDate ? new Date(buyDate) : undefined,
-        imgUrl,
-        sellPrice,
-        sellDate: sellDate ? new Date(sellDate) : undefined,
-        notes,
-      },
+      data: safeData,
     });
-
     return NextResponse.json(updated);
   } catch (err) {
     console.error(err);
@@ -70,10 +81,18 @@ export async function PUT(
 
 // Delete a car
 export async function DELETE(
-  _: Request,
-  context: { params: Promise<{ id: string }> }
+  _req: Request,
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await context.params;
+  const parsed = idParamSchema.safeParse(params);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid car id", issues: parsed.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const { id } = parsed.data;
 
   try {
     await prisma.car.delete({ where: { id } });

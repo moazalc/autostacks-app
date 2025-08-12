@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "../../../../generated/prisma";
 import { withAccelerate } from "@prisma/extension-accelerate";
+import { entryCreateSchema } from "@/lib/validation";
+import { z } from "zod";
 
 const prisma = new PrismaClient().$extends(withAccelerate());
 
@@ -33,25 +35,40 @@ async function recalcBalance(accountId: string) {
   return newBalance;
 }
 
+// ✅ Keep your original behavior: accountId is optional in GET,
+// but validate it if provided.
+const listQuerySchema = z.object({
+  accountId: z.uuid().optional(),
+});
+
 // Create Entry
 export async function POST(req: Request) {
   try {
-    const { accountId, amount, type, description, relatedCarId, date } =
-      await req.json();
+    const body = await req.json();
+
+    const parsed = entryCreateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid body", issues: parsed.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const data = parsed.data;
 
     const entry = await prisma.entry.create({
       data: {
-        accountId,
-        amount,
-        type,
-        description,
-        relatedCarId,
-        date: new Date(date),
+        accountId: data.accountId,
+        amount: data.amount,
+        type: data.type,
+        description: data.description,
+        relatedCarId: data.relatedCarId,
+        date: data.date,
       },
     });
 
-    const balance = await recalcBalance(accountId);
-    return NextResponse.json({ entry, balance });
+    const balance = await recalcBalance(data.accountId);
+    return NextResponse.json({ entry, balance }, { status: 201 });
   } catch (err) {
     console.log(err);
     return NextResponse.json(
@@ -62,11 +79,21 @@ export async function POST(req: Request) {
 }
 
 // Get all entries
-
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const accountId = searchParams.get("accountId");
+
+    const parsed = listQuerySchema.safeParse({
+      accountId: searchParams.get("accountId") ?? undefined,
+    });
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid query", issues: parsed.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const accountId = parsed.data.accountId;
 
     const entries = await prisma.entry.findMany({
       where: accountId ? { accountId } : undefined,

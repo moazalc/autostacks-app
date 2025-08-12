@@ -1,46 +1,32 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "../../../../generated/prisma";
 import { withAccelerate } from "@prisma/extension-accelerate";
+import { z } from "zod";
+import { carCreateSchema } from "@/lib/validation";
 
 const prisma = new PrismaClient().$extends(withAccelerate());
 
+// Validate query (?accountId=...)
+const listQuerySchema = z.object({
+  accountId: z.uuid(),
+});
+
 export async function POST(req: Request) {
   try {
-    const {
-      accountId,
-      make,
-      model,
-      year,
-      buyPrice,
-      buyDate,
-      imgUrl,
-      sellPrice,
-      sellDate,
-      notes,
-    } = await req.json();
+    const body = await req.json();
+    const parsed = carCreateSchema.safeParse(body);
 
-    if (!accountId) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { message: "accountId is required" },
+        { message: "Invalid body", issues: parsed.error.issues },
         { status: 400 }
       );
     }
 
-    const car = await prisma.car.create({
-      data: {
-        accountId,
-        make,
-        model,
-        year: Number(year),
-        buyPrice,
-        buyDate: new Date(buyDate),
-        imgUrl,
-        sellPrice,
-        sellDate: sellDate ? new Date(sellDate) : undefined,
-        notes,
-      },
-    });
-    return NextResponse.json(car);
+    const data = parsed.data; // Already typed & coerced
+
+    const car = await prisma.car.create({ data });
+    return NextResponse.json(car, { status: 201 });
   } catch (err) {
     console.error(err);
     return NextResponse.json(
@@ -50,9 +36,28 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const cars = await prisma.car.findMany();
+    const { searchParams } = new URL(req.url);
+    const parsed = listQuerySchema.safeParse({
+      accountId: searchParams.get("accountId"),
+    });
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          message: "accountId (uuid) is required",
+          issues: parsed.error.issues,
+        },
+        { status: 400 }
+      );
+    }
+
+    const cars = await prisma.car.findMany({
+      where: { accountId: parsed.data.accountId },
+      orderBy: { createdAt: "desc" },
+    });
+
     return NextResponse.json(cars);
   } catch (err) {
     console.error(err);
