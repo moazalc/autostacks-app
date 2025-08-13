@@ -51,12 +51,8 @@
     "recharts": "^2.15.4",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
-<<<<<<< HEAD
-    "zod": "^4.0.15"
-=======
-    "vaul": "^1.1.2",
-    "zod": "^4.0.17"
->>>>>>> 3c23cd3 (WAS ON THE WRONG DAMN TIMELINE)
+"vaul": "^1.1.2",
+"zod": "^4.0.17"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
