@@ -1,0 +1,98 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  imgUrl    String?
+  createdAt DateTime @default(now())
+
+  accounts AccountUser[]
+}
+
+model Account {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  users    AccountUser[]
+  cars     Car[]
+  entries  Entry[]
+  balances Balance[]
+}
+
+model AccountUser {
+  id        String @id @default(uuid())
+  userId    String
+  accountId String
+
+  user    User    @relation(fields: [userId], references: [id])
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@unique([userId, accountId])
+}
+
+model Car {
+  id        String  @id @default(uuid())
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id])
+
+  make      String
+  model     String
+  year      Int
+  imgUrl    String?
+  buyPrice  Float
+  buyDate   DateTime
+  sellPrice Float?
+  sellDate  DateTime?
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Entry     Entry[]
+}
+
+model Entry {
+  id        String  @id @default(uuid())
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id])
+
+  amount       Float
+  type         EntryType
+  description  String?
+  relatedCarId String?
+  relatedCar   Car?      @relation(fields: [relatedCarId], references: [id])
+  date         DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Balance {
+  id        String  @id @default(uuid())
+  accountId String  @unique
+  account   Account @relation(fields: [accountId], references: [id])
+
+  amount    Float
+  updatedAt DateTime @updatedAt
+}
+
+enum EntryType {
+  CREDIT
+  DEBIT
+}
