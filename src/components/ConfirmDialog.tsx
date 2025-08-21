@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Button } from "../ui/button";
+import { Button } from "./ui/button";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogFooter,
   DialogTitle,
-} from "../ui/dialog";
+} from "./ui/dialog";
 
 export default function ConfirmDialog({
   open,

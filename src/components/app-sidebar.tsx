@@ -14,7 +14,7 @@ import {
   IconSettings,
 } from "@tabler/icons-react";
 
-import { NavDocuments } from "@/components/nav-documents";
+// import { NavDocuments } from "@/components/nav-documents";
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
 import { NavUser } from "@/components/nav-user";
@@ -57,11 +57,11 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
     { title: "Search", url: "/dashboard/search", icon: IconSearch },
   ];
 
-  const documents = [
-    { name: "Data Library", url: "/dashboard/library", icon: IconDatabase },
-    { name: "Reports", url: "/dashboard/reports", icon: IconReport },
-    { name: "Word Assistant", url: "/dashboard/assistant", icon: IconFileWord },
-  ];
+  // const documents = [
+  //   { name: "Data Library", url: "/dashboard/library", icon: IconDatabase },
+  //   { name: "Reports", url: "/dashboard/reports", icon: IconReport },
+  //   { name: "Word Assistant", url: "/dashboard/assistant", icon: IconFileWord },
+  // ];
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -72,7 +72,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
-              <a href="#">
+              <a href="/dashboard">
                 <Layers className="!size-5" />
                 <span className="text-base font-semibold">AutoStacks</span>
               </a>
@@ -82,7 +82,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navMain} />
-        <NavDocuments items={documents} />
+        {/* <NavDocuments items={documents} /> */}
         <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>

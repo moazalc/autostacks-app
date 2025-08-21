@@ -1,12 +1,13 @@
+// path: components/cars/CarsClient.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// path: components/cars/CarsClient.tsx
 "use client";
+
 import React, { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { toast } from "sonner";
 import CarForm from "./CarForm";
-import ConfirmDialog from "./ConfirmDialog";
+import ConfirmDialog from "../ConfirmDialog";
 import type { Car } from "./CarForm";
 import {
   Table,
@@ -18,6 +19,14 @@ import {
 } from "../ui/table";
 import { Image } from "@radix-ui/react-avatar";
 import { Grid3X3, List, Plus } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "../ui/dialog";
+import ExportButton from "../export-button";
 
 export default function CarsClient({
   initialData,
@@ -141,11 +150,12 @@ export default function CarsClient({
         </div>
       );
     return (
-      <Image src={src} alt="thumb" className="w-20 h-12 object-cover rounded" />
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={src} alt="thumb" className="w-20 h-12 object-cover rounded" />
     );
   };
 
-  async function handleSaved(car: Car) {
+  async function handleSaved(_car?: Car) {
     // called after CarForm success
     setFormOpen(false);
     setEditing(null);
@@ -163,8 +173,12 @@ export default function CarsClient({
             {items.length} items
           </p>
         </div>
+
         <div className="flex gap-2 items-center">
-          <Button onClick={openAdd}>+ Add Car</Button>
+          <ExportButton />
+          <Button onClick={openAdd}>
+            <Plus className="mr-2 h-4 w-4" /> Add Car
+          </Button>
 
           <div className="flex border rounded-lg">
             <Button
@@ -185,7 +199,7 @@ export default function CarsClient({
         </div>
       </div>
 
-      {/* Table view using shadcn Table */}
+      {/* Table view  */}
       {view === "table" && (
         <div className="overflow-auto border rounded">
           <Table>
@@ -292,9 +306,7 @@ export default function CarsClient({
                     <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
                       <Plus className="h-8 w-8" />
                     </div>
-                    <h3 className="text-lg font-semibold mb-2">
-                      No cars found
-                    </h3>
+                    <h3 className="text-lg font-semibold">No cars found</h3>
                     <p>Add your first car to get started</p>
                     <Button
                       onClick={openAdd}
@@ -372,23 +384,31 @@ export default function CarsClient({
         </div>
       )}
 
-      {/* Car form modal */}
-      {formOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white w-full max-w-3xl rounded shadow-lg p-6 overflow-auto max-h-[90vh]">
+      {/* Car form modal (shadcn Dialog) */}
+      <Dialog
+        open={formOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setFormOpen(false);
+            setEditing(null);
+          }
+        }}
+      >
+        <DialogContent className="w-full max-w-3xl p-0">
+          <div className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium">
+              <DialogTitle className="text-lg font-medium">
                 {editing ? "Edit Car" : "Add Car"}
-              </h3>
-              <Button
+              </DialogTitle>
+              {/* <Button
                 variant="ghost"
                 onClick={() => {
                   setFormOpen(false);
                   setEditing(null);
                 }}
               >
-                Close
-              </Button>
+                <X />
+              </Button> */}
             </div>
 
             <CarForm
@@ -401,8 +421,9 @@ export default function CarsClient({
               }}
             />
           </div>
-        </div>
-      )}
+          <DialogFooter />
+        </DialogContent>
+      </Dialog>
 
       {/* Confirm dialog */}
       <ConfirmDialog

@@ -7,6 +7,13 @@ import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 
 export type Car = {
   id?: string | undefined;
@@ -175,15 +182,19 @@ export default function CarForm({
 
       <div>
         <Label className="mb-1">Status</Label>
-        <select
+        <Select
           value={status ?? ""}
-          onChange={(e) => setStatus(e.target.value)}
-          className="w-full border rounded px-2 py-2"
+          onValueChange={(v: string) => setStatus(v)}
         >
-          <option value="available">Available</option>
-          <option value="sold">Sold</option>
-          <option value="pending">Pending</option>
-        </select>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="available">Available</SelectItem>
+            <SelectItem value="sold">Sold</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div>
@@ -194,14 +205,15 @@ export default function CarForm({
       <div>
         <Label className="mb-1">Image</Label>
         <div className="flex gap-2 items-center">
-          <input type="file" accept="image/*" onChange={onFile} />
-          <button
+          <Input type="file" accept="image/*" onChange={onFile} />
+          <Button
+            variant="ghost"
             type="button"
-            className="text-sm underline text-muted-foreground"
+            className="text-sm underline cursor-pointer "
             onClick={() => setImgDataUrl(null)}
           >
             Clear
-          </button>
+          </Button>
         </div>
         {imgDataUrl && (
           // eslint-disable-next-line @next/next/no-img-element
