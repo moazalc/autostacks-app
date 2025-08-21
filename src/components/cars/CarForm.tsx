@@ -1,185 +1,225 @@
-// components/cars/CarForm.tsx
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// path: components/cars/CarForm.tsx
 "use client";
-import React, { useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import type { Car } from "./types";
+import React, { useEffect, useState } from "react";
+import { Label } from "../ui/label";
+import { Input } from "../ui/input";
+import { Button } from "../ui/button";
+import { Textarea } from "../ui/textarea";
+import { toast } from "sonner";
 
+export type Car = {
+  id?: string | undefined;
+  make?: string | null | undefined;
+  model?: string | null | undefined;
+  year?: number | null | undefined;
+  price?: number | null | undefined;
+  buyPrice?: number | null | undefined;
+  status?: string | null | undefined;
+  vin?: string | null | undefined;
+  imgUrl?: string | null | undefined;
+};
 export default function CarForm({
-  car,
-  onSave,
+  initial = null,
+  accountId,
+  onSaved,
   onCancel,
 }: {
-  car?: Car | null;
-  onSave: (data: Partial<Car>) => void;
+  initial?: Car | null | undefined;
+  accountId?: string | undefined;
+  onSaved?: (car: Car) => void | Promise<void>;
   onCancel?: () => void;
 }) {
-  const [formData, setFormData] = useState({
-    id: car?.id,
-    make: car?.make || "",
-    model: car?.model || "",
-    year: car?.year || new Date().getFullYear(),
-    vin: car?.vin || "",
-    stockId: car?.stockId || "",
-    buyPrice: car?.buyPrice || 0,
-    sellPrice: car?.sellPrice || 0,
-    status: car?.status || "available",
-    imgUrl: car?.imgUrl || "",
-    notes: car?.notes || "",
-  });
+  const [make, setMake] = useState(initial?.make ?? "");
+  const [model, setModel] = useState(initial?.model ?? "");
+  const [year, setYear] = useState<string>(
+    initial?.year ? String(initial.year) : ""
+  );
+  const [price, setPrice] = useState<string>(
+    initial?.price ? String(initial.price) : ""
+  );
+  const [buyPrice, setBuyPrice] = useState<string>(
+    initial?.buyPrice ? String(initial.buyPrice) : ""
+  );
+  const [vin, setVin] = useState(initial?.vin ?? "");
+  const [status, setStatus] = useState(initial?.status ?? "available");
+  const [imgDataUrl, setImgDataUrl] = useState<string | null>(
+    initial?.imgUrl ?? null
+  );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    // reset when initial changes (edit different item)
+    setMake(initial?.make ?? "");
+    setModel(initial?.model ?? "");
+    setYear(initial?.year ? String(initial.year) : "");
+    setPrice(initial?.price ? String(initial.price) : "");
+    setBuyPrice(initial?.buyPrice ? String(initial.buyPrice) : "");
+    setVin(initial?.vin ?? "");
+    setStatus(initial?.status ?? "available");
+    setImgDataUrl(initial?.imgUrl ?? null);
+  }, [initial]);
+
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImgDataUrl(String(reader.result));
+    };
+    reader.readAsDataURL(f);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    onSave(formData);
-  };
+    if (!make.trim() || !model.trim()) {
+      toast.error("Please enter make and model");
+      return;
+    }
+    setSaving(true);
+    try {
+      const body: any = {
+        make: make.trim(),
+        model: model.trim(),
+        year: year ? Number(year) : null,
+        price: price ? Number(price) : null,
+        buyPrice: buyPrice ? Number(buyPrice) : null,
+        vin: vin ? vin.trim() : null,
+        status: status ?? null,
+        imgUrl: imgDataUrl ?? null,
+      };
+      if (accountId) body.accountId = accountId;
+
+      const method = initial?.id ? "PUT" : "POST";
+      const url = initial?.id ? `/api/cars/${initial.id}` : `/api/cars`;
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Save failed");
+      }
+
+      const saved = await res.json();
+      toast.success(initial?.id ? "Updated" : "Created");
+      onSaved?.(saved);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message ?? "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="make">Make *</Label>
-          <Input
-            id="make"
-            required
-            value={formData.make}
-            onChange={(e) =>
-              setFormData((p) => ({ ...p, make: e.target.value }))
-            }
-          />
-        </div>
-        <div>
-          <Label htmlFor="model">Model *</Label>
-          <Input
-            id="model"
-            required
-            value={formData.model}
-            onChange={(e) =>
-              setFormData((p) => ({ ...p, model: e.target.value }))
-            }
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="year">Year *</Label>
-          <Input
-            id="year"
-            type="number"
-            required
-            min={1900}
-            max={2030}
-            value={String(formData.year)}
-            onChange={(e) =>
-              setFormData((p) => ({ ...p, year: Number(e.target.value) }))
-            }
-          />
-        </div>
-        <div>
-          <Label htmlFor="status">Status</Label>
-          <Select
-            value={formData.status}
-            onValueChange={(v) =>
-              setFormData((p) => ({ ...p, status: v as "available" | "sold" }))
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="available">Available</SelectItem>
-              <SelectItem value="sold">Sold</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="vin">VIN</Label>
-          <Input
-            id="vin"
-            value={formData.vin}
-            onChange={(e) =>
-              setFormData((p) => ({ ...p, vin: e.target.value }))
-            }
-          />
-        </div>
-        <div>
-          <Label htmlFor="stockId">Stock ID</Label>
-          <Input
-            id="stockId"
-            value={formData.stockId}
-            onChange={(e) =>
-              setFormData((p) => ({ ...p, stockId: e.target.value }))
-            }
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="buyPrice">Buy Price *</Label>
-          <Input
-            id="buyPrice"
-            type="number"
-            required
-            value={String(formData.buyPrice)}
-            onChange={(e) =>
-              setFormData((p) => ({ ...p, buyPrice: Number(e.target.value) }))
-            }
-          />
-        </div>
-        <div>
-          <Label htmlFor="sellPrice">Sell Price</Label>
-          <Input
-            id="sellPrice"
-            type="number"
-            value={String(formData.sellPrice || 0)}
-            onChange={(e) =>
-              setFormData((p) => ({ ...p, sellPrice: Number(e.target.value) }))
-            }
-          />
-        </div>
-      </div>
-
       <div>
-        <Label htmlFor="imgUrl">Image URL</Label>
+        <Label className="mb-1">Make</Label>
         <Input
-          id="imgUrl"
-          value={formData.imgUrl}
-          onChange={(e) =>
-            setFormData((p) => ({ ...p, imgUrl: e.target.value }))
-          }
+          value={make}
+          onChange={(e) => setMake(e.target.value)}
+          placeholder="Toyota"
         />
       </div>
 
       <div>
-        <Label htmlFor="notes">Notes</Label>
-        <Textarea
-          id="notes"
-          rows={3}
-          value={formData.notes || ""}
-          onChange={(e) =>
-            setFormData((p) => ({ ...p, notes: e.target.value }))
-          }
+        <Label className="mb-1">Model</Label>
+        <Input
+          value={model}
+          onChange={(e) => setModel(e.target.value)}
+          placeholder="Camry"
         />
       </div>
 
-      <div className="flex justify-end gap-2 pt-4">
-        <Button type="button" variant="outline" onClick={onCancel}>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label className="mb-1">Year</Label>
+          <Input
+            value={year}
+            onChange={(e) => setYear(e.target.value.replace(/\D/g, ""))}
+            placeholder="2022"
+          />
+        </div>
+        <div>
+          <Label className="mb-1">VIN</Label>
+          <Input
+            value={vin}
+            onChange={(e) => setVin(e.target.value)}
+            placeholder="Stock ID / VIN"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label className="mb-1">Buy Price</Label>
+          <Input
+            value={buyPrice}
+            onChange={(e) => setBuyPrice(e.target.value.replace(/[^\d.]/g, ""))}
+            placeholder="15000"
+          />
+        </div>
+        <div>
+          <Label className="mb-1">Sell Price</Label>
+          <Input
+            value={price}
+            onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))}
+            placeholder="18000"
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label className="mb-1">Status</Label>
+        <select
+          value={status ?? ""}
+          onChange={(e) => setStatus(e.target.value)}
+          className="w-full border rounded px-2 py-2"
+        >
+          <option value="available">Available</option>
+          <option value="sold">Sold</option>
+          <option value="pending">Pending</option>
+        </select>
+      </div>
+
+      <div>
+        <Label className="mb-1">Notes</Label>
+        <Textarea placeholder="Optional notes..." />
+      </div>
+
+      <div>
+        <Label className="mb-1">Image</Label>
+        <div className="flex gap-2 items-center">
+          <input type="file" accept="image/*" onChange={onFile} />
+          <button
+            type="button"
+            className="text-sm underline text-muted-foreground"
+            onClick={() => setImgDataUrl(null)}
+          >
+            Clear
+          </button>
+        </div>
+        {imgDataUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imgDataUrl}
+            alt="preview"
+            className="mt-2 w-48 h-32 object-cover rounded-md"
+          />
+        )}
+      </div>
+
+      <div className="flex gap-2 justify-end">
+        <Button variant="ghost" type="button" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit">Save Car</Button>
+        <Button type="submit" disabled={saving}>
+          {saving ? "Saving..." : initial?.id ? "Save changes" : "Create car"}
+        </Button>
       </div>
     </form>
   );
