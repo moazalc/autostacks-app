@@ -52,9 +52,8 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
   ];
 
   const navSecondary = [
-    { title: "Settings", url: "/dashboard/settings", icon: IconSettings },
-    { title: "Get Help", url: "/dashboard/help", icon: IconHelp },
-    { title: "Search", url: "/dashboard/search", icon: IconSearch },
+    { title: "Settings", url: "/settings", icon: IconSettings },
+    { title: "Get Help", url: "/help", icon: IconHelp },
   ];
 
   // const documents = [

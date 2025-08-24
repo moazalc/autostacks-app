@@ -26,6 +26,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { signOut } from "next-auth/react";
+import Link from "next/link";
 
 export type NavUserShape = {
   name: string;
@@ -101,15 +102,9 @@ export function NavUser({ user }: { user: NavUserShape }) {
             <DropdownMenuGroup>
               <DropdownMenuItem>
                 <IconUserCircle />
-                Account
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <IconCreditCard />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <IconNotification />
-                Notifications
+                <Link href="/account" className="w-full">
+                  <span className="cursor-pointer w-full">Account</span>
+                </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
@@ -123,7 +118,7 @@ export function NavUser({ user }: { user: NavUserShape }) {
                   e.key === "Enter" &&
                   signOut({ callbackUrl: "/api/auth/signin" })
                 }
-                className="cursor-pointer"
+                className="cursor-pointer w-full"
               >
                 Logout
               </span>
