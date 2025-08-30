@@ -1,4 +1,4 @@
-// path: components/cars/CarsClient.tsx
+// path: components/cars/CarClient.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
@@ -6,9 +6,8 @@
 import React, { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { toast } from "sonner";
-import CarForm from "./CarForm";
+import CarForm, { Car } from "./CarForm";
 import ConfirmDialog from "../ConfirmDialog";
-import type { Car } from "./CarForm";
 import {
   Table,
   TableBody,
@@ -17,16 +16,13 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
-import { Image } from "@radix-ui/react-avatar";
 import { Grid3X3, List, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogFooter,
+  DialogTitle,
 } from "../ui/dialog";
-import ExportButton from "../export-button";
 
 export default function CarsClient({
   initialData,
@@ -51,11 +47,60 @@ export default function CarsClient({
   } | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
 
-  useEffect(() => {
-    setItems(initialData?.items ?? []);
-  }, [initialData]);
+  const isUuid = (s?: string | null) =>
+    typeof s === "string" &&
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(
+      s
+    );
 
-  async function loadList() {
+  // load list (server-backed)
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+
+    async function load() {
+      setLoading(true);
+      try {
+        // show initial snapshot
+        if (initialData?.items) setItems(initialData.items);
+
+        const params = new URLSearchParams();
+        if (accountId) params.set("accountId", accountId);
+
+        const res = await fetch(`/api/cars?${params.toString()}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || "Failed to fetch cars");
+        }
+
+        if (cancelled) return;
+        const data = await res.json();
+        const itemsFromApi = Array.isArray(data) ? data : data.items ?? [];
+        if (!cancelled) setItems(itemsFromApi);
+      } catch (err: any) {
+        if (!cancelled) {
+          console.error(err);
+          if (err.name !== "AbortError") toast.error(err?.message ?? "Failed to load cars");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountId]);
+
+  async function refresh() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -65,17 +110,14 @@ export default function CarsClient({
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      setItems(data.items ?? []);
+      const itemsFromApi = Array.isArray(data) ? data : data.items ?? [];
+      setItems(itemsFromApi);
     } catch (err: any) {
       console.error(err);
-      toast.error(err?.message ?? "Failed to load cars");
+      toast.error(err?.message ?? "Failed to refresh cars");
     } finally {
       setLoading(false);
     }
-  }
-
-  async function refresh() {
-    await loadList();
   }
 
   function openAdd() {
@@ -101,21 +143,26 @@ export default function CarsClient({
     if (!confirmPayload) return;
     setConfirmLoading(true);
     try {
-      if (confirmPayload.action === "delete") {
-        const res = await fetch(`/api/cars/${confirmPayload.id}`, {
-          method: "DELETE",
-        });
-        if (!res.ok) throw new Error(await res.text());
+      const { id, action } = confirmPayload;
+      if (action === "delete") {
+        if (isUuid(id)) {
+          const res = await fetch(`/api/cars/${id}`, { method: "DELETE" });
+          if (!res.ok) throw new Error(await res.text());
+        }
         toast.success("Deleted");
       } else {
-        const res = await fetch(`/api/cars/${confirmPayload.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "sold" }),
-        });
-        if (!res.ok) throw new Error(await res.text());
+        // mark sold
+        if (isUuid(id)) {
+          const res = await fetch(`/api/cars/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "sold" }),
+          });
+          if (!res.ok) throw new Error(await res.text());
+        }
         toast.success("Marked as sold");
       }
+
       setConfirmOpen(false);
       setConfirmPayload(null);
       await refresh();
@@ -127,21 +174,56 @@ export default function CarsClient({
     }
   }
 
-  // helpers
-  const StatusBadge = ({ status }: { status?: string | null }) => {
-    const s = status ?? "available";
-    const base = "inline-block px-2 py-0.5 rounded text-xs font-medium";
-    if (s === "sold")
-      return <span className={`${base} bg-red-100 text-red-800`}>Sold</span>;
-    if (s === "pending")
-      return (
-        <span className={`${base} bg-yellow-100 text-yellow-800`}>Pending</span>
-      );
-    return (
-      <span className={`${base} bg-green-100 text-green-800`}>Available</span>
-    );
-  };
+  // Main save handler: POST for new cars; PUT for updates (only if id is uuid)
+  async function handleSave(car: Car) {
+    try {
+      // normalize image/url fields & optional values here if needed
+      const payload: any = {
+        accountId: (car as any).accountId ?? accountId,
+        make: car.make,
+        model: car.model,
+        year: car.year,
+        imgUrl: car.imgUrl ?? undefined,
+        buyPrice: typeof car.buyPrice === "number" ? car.buyPrice : car.buyPrice ? Number(car.buyPrice) : undefined,
+        buyDate: (car as any).buyDate ?? undefined,
+        sellPrice: typeof car.sellPrice === "number" ? car.sellPrice : car.sellPrice ? Number(car.sellPrice) : undefined,
+        sellDate: (car as any).sellDate ?? undefined,
+        notes: (car as any).notes ?? undefined,
+      };
 
+      if (!payload.accountId) {
+        toast.error("Missing accountId — cannot save car.");
+        return;
+      }
+
+      const shouldUpdate = Boolean(car.id) && isUuid(car.id as string);
+      const url = shouldUpdate ? `/api/cars/${car.id}` : `/api/cars`;
+      const method = shouldUpdate ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Save failed");
+      }
+
+      // refresh authoritative list
+      await refresh();
+
+      setFormOpen(false);
+      setEditing(null);
+      toast.success(shouldUpdate ? "Updated" : "Created");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message ?? "Failed to save car");
+    }
+  }
+
+  // helpers (UI)
   const ImgThumb = ({ src }: { src?: string | null }) => {
     if (!src)
       return (
@@ -155,51 +237,29 @@ export default function CarsClient({
     );
   };
 
-  async function handleSaved(_car?: Car) {
-    // called after CarForm success
-    setFormOpen(false);
-    setEditing(null);
-    toast.success("Saved");
-    await refresh();
-  }
-
   return (
     <div>
       {/* Top controls */}
       <div className="flex items-end justify-between mb-4 gap-2">
         <div className="ml-4">
           <h1 className="text-3xl font-semibold">Cars</h1>
-          <p className="text-sm text-muted-foreground ml-1">
-            {items.length} items
-          </p>
+          <p className="text-sm text-muted-foreground ml-1">{items.length} items</p>
         </div>
-
         <div className="flex gap-2 items-center">
-          <ExportButton />
-          <Button onClick={openAdd}>
-            <Plus className="mr-2 h-4 w-4" /> Add Car
-          </Button>
+          <Button onClick={openAdd}>+ Add Car</Button>
 
           <div className="flex border rounded-lg">
-            <Button
-              variant={view === "table" ? "default" : "ghost"}
-              onClick={() => setView("table")}
-              className="rounded-r-none"
-            >
+            <Button variant={view === "table" ? "default" : "ghost"} onClick={() => setView("table")} className="rounded-r-none">
               <List className="h-4 w-4" />
             </Button>
-            <Button
-              variant={view === "grid" ? "default" : "ghost"}
-              onClick={() => setView("grid")}
-              className="rounded-l-none"
-            >
+            <Button variant={view === "grid" ? "default" : "ghost"} onClick={() => setView("grid")} className="rounded-l-none">
               <Grid3X3 className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Table view  */}
+      {/* Table view */}
       {view === "table" && (
         <div className="overflow-auto border rounded">
           <Table>
@@ -250,47 +310,30 @@ export default function CarsClient({
                     </TableCell>
                     <TableCell>
                       <div className="font-medium">{c.make ?? "-"}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {c.model ?? "-"}
-                      </div>
+                      <div className="text-sm text-muted-foreground">{c.model ?? "-"}</div>
                     </TableCell>
                     <TableCell>
                       <div>{c.year ?? "-"}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {c.vin ?? "-"}
-                      </div>
+                      <div className="text-sm text-muted-foreground">{(c as any).vin ?? "-"}</div>
                     </TableCell>
                     <TableCell>
                       <div>{c.buyPrice ?? "-"}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {c.price ?? "-"}
-                      </div>
+                      <div className="text-sm text-muted-foreground">{c.sellPrice ?? "-"}</div>
                     </TableCell>
                     <TableCell>
-                      <StatusBadge status={c.status} />
+                      <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                        {c.sellDate ? "Sold" : "Available"}
+                      </span>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => openEdit(c)}
-                        >
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(c)}>
                           Edit
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => openConfirm(c.id, "markSold")}
-                          disabled={c.status === "sold"}
-                        >
+                        <Button size="sm" variant="ghost" onClick={() => openConfirm(c.id, "markSold")} disabled={c.sellDate != null}>
                           Mark sold
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => openConfirm(c.id, "delete")}
-                        >
+                        <Button size="sm" variant="destructive" onClick={() => openConfirm(c.id, "delete")}>
                           Delete
                         </Button>
                       </div>
@@ -299,20 +342,13 @@ export default function CarsClient({
                 ))
               ) : (
                 <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="p-4 text-center text-sm text-muted-foreground"
-                  >
+                  <TableCell colSpan={7} className="p-4 text-center text-sm text-muted-foreground">
                     <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
                       <Plus className="h-8 w-8" />
                     </div>
                     <h3 className="text-lg font-semibold">No cars found</h3>
                     <p>Add your first car to get started</p>
-                    <Button
-                      onClick={openAdd}
-                      variant="ghost"
-                      className="mt-2 border border-gray-300"
-                    >
+                    <Button onClick={openAdd} variant="ghost" className="mt-2 border border-gray-300">
                       Add Car
                     </Button>
                   </TableCell>
@@ -323,7 +359,7 @@ export default function CarsClient({
         </div>
       )}
 
-      {/* Grid view (cards) */}
+      {/* Grid view */}
       {view === "grid" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {loading
@@ -333,49 +369,29 @@ export default function CarsClient({
                 </div>
               ))
             : items.map((c) => (
-                <div
-                  key={c.id ?? `card-${c.vin ?? Math.random()}`}
-                  className="border rounded p-3"
-                >
+                <div key={c.id ?? `card-${Math.random()}`} className="border rounded p-3">
                   <div className="flex gap-3">
                     <ImgThumb src={c.imgUrl} />
                     <div className="flex-1">
-                      <div className="font-medium">
-                        {c.make} {c.model}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {c.year ?? "-"} • {c.vin ?? "-"}
-                      </div>
+                      <div className="font-medium">{c.make} {c.model}</div>
+                      <div className="text-sm text-muted-foreground">{c.year ?? "-"} • {(c as any).vin ?? "-"}</div>
                       <div className="mt-2 flex items-center gap-2">
-                        <StatusBadge status={c.status} />
-                        <div className="text-sm text-muted-foreground">
-                          {c.price ?? "-"}
-                        </div>
+                        <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                          {c.sellDate ? "Sold" : "Available"}
+                        </span>
+                        <div className="text-sm text-muted-foreground">{c.sellPrice ?? "-"}</div>
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-3 flex gap-2 justify-end">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => openEdit(c)}
-                    >
+                    <Button size="sm" variant="ghost" onClick={() => openEdit(c)}>
                       Edit
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => openConfirm(c.id, "markSold")}
-                      disabled={c.status === "sold"}
-                    >
+                    <Button size="sm" variant="ghost" onClick={() => openConfirm(c.id, "markSold")} disabled={c.sellDate != null}>
                       Mark sold
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => openConfirm(c.id, "delete")}
-                    >
+                    <Button size="sm" variant="destructive" onClick={() => openConfirm(c.id, "delete")}>
                       Delete
                     </Button>
                   </div>
@@ -384,7 +400,7 @@ export default function CarsClient({
         </div>
       )}
 
-      {/* Car form modal (shadcn Dialog) */}
+      {/* Car form modal (dialog) */}
       <Dialog
         open={formOpen}
         onOpenChange={(open) => {
@@ -397,24 +413,13 @@ export default function CarsClient({
         <DialogContent className="w-full max-w-3xl p-0">
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <DialogTitle className="text-lg font-medium">
-                {editing ? "Edit Car" : "Add Car"}
-              </DialogTitle>
-              {/* <Button
-                variant="ghost"
-                onClick={() => {
-                  setFormOpen(false);
-                  setEditing(null);
-                }}
-              >
-                <X />
-              </Button> */}
+              <DialogTitle className="text-lg font-medium">{editing ? "Edit Car" : "Add Car"}</DialogTitle>
             </div>
 
             <CarForm
               initial={editing}
               accountId={accountId}
-              onSaved={handleSaved}
+              onSaved={handleSave}
               onCancel={() => {
                 setFormOpen(false);
                 setEditing(null);
@@ -429,22 +434,14 @@ export default function CarsClient({
       <ConfirmDialog
         open={confirmOpen}
         loading={confirmLoading}
-        title={
-          confirmPayload?.action === "delete" ? "Delete car?" : "Mark as sold?"
-        }
-        description={
-          confirmPayload?.action === "delete"
-            ? "This will permanently remove the car."
-            : "This will mark the car as sold."
-        }
+        title={confirmPayload?.action === "delete" ? "Delete car?" : "Mark as sold?"}
+        description={confirmPayload?.action === "delete" ? "This will permanently remove the car." : "This will mark the car as sold."}
         onConfirm={runConfirm}
         onCancel={() => {
           setConfirmOpen(false);
           setConfirmPayload(null);
         }}
-        confirmLabel={
-          confirmPayload?.action === "delete" ? "Delete" : "Mark sold"
-        }
+        confirmLabel={confirmPayload?.action === "delete" ? "Delete" : "Mark sold"}
       />
     </div>
   );

@@ -22,10 +22,22 @@ export type Car = {
   year?: number | null | undefined;
   price?: number | null | undefined;
   buyPrice?: number | null | undefined;
+  sellPrice?: number | null | undefined;
+  buyDate?: string | Date | null | undefined;
+  sellDate?: string | Date | null | undefined;
   status?: string | null | undefined;
   vin?: string | null | undefined;
   imgUrl?: string | null | undefined;
+  notes?: string | null | undefined;
 };
+
+function toDateInputValue(d?: string | Date | null) {
+  if (!d) return "";
+  const dt = typeof d === "string" ? new Date(d) : d;
+  if (Number.isNaN(dt.getTime())) return "";
+  return dt.toISOString().slice(0, 10); // yyyy-mm-dd
+}
+
 export default function CarForm({
   initial = null,
   accountId,
@@ -42,17 +54,28 @@ export default function CarForm({
   const [year, setYear] = useState<string>(
     initial?.year ? String(initial.year) : ""
   );
-  const [price, setPrice] = useState<string>(
-    initial?.price ? String(initial.price) : ""
-  );
+
   const [buyPrice, setBuyPrice] = useState<string>(
     initial?.buyPrice ? String(initial.buyPrice) : ""
   );
+  const [sellPrice, setSellPrice] = useState<string>(
+    initial?.sellPrice ? String(initial.sellPrice) : ""
+  );
+
   const [vin, setVin] = useState(initial?.vin ?? "");
   const [status, setStatus] = useState(initial?.status ?? "available");
   const [imgDataUrl, setImgDataUrl] = useState<string | null>(
     initial?.imgUrl ?? null
   );
+
+  const [buyDate, setBuyDate] = useState<string>(
+    toDateInputValue(initial?.buyDate)
+  );
+  const [sellDate, setSellDate] = useState<string>(
+    toDateInputValue(initial?.sellDate)
+  );
+
+  const [notes, setNotes] = useState<string>((initial as any)?.notes ?? "");
 
   const [saving, setSaving] = useState(false);
 
@@ -61,11 +84,14 @@ export default function CarForm({
     setMake(initial?.make ?? "");
     setModel(initial?.model ?? "");
     setYear(initial?.year ? String(initial.year) : "");
-    setPrice(initial?.price ? String(initial.price) : "");
     setBuyPrice(initial?.buyPrice ? String(initial.buyPrice) : "");
+    setSellPrice(initial?.sellPrice ? String(initial.sellPrice) : "");
     setVin(initial?.vin ?? "");
     setStatus(initial?.status ?? "available");
     setImgDataUrl(initial?.imgUrl ?? null);
+    setBuyDate(toDateInputValue(initial?.buyDate));
+    setSellDate(toDateInputValue(initial?.sellDate));
+    setNotes((initial as any)?.notes ?? "");
   }, [initial]);
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -84,18 +110,30 @@ export default function CarForm({
       toast.error("Please enter make and model");
       return;
     }
+
+    // server requires buyDate (z.coerce.date())
+    if (!buyDate) {
+      toast.error("Please select a buy date");
+      return;
+    }
+
     setSaving(true);
     try {
       const body: any = {
         make: make.trim(),
         model: model.trim(),
-        year: year ? Number(year) : null,
-        price: price ? Number(price) : null,
-        buyPrice: buyPrice ? Number(buyPrice) : null,
-        vin: vin ? vin.trim() : null,
-        status: status ?? null,
-        imgUrl: imgDataUrl ?? null,
+        year: year ? Number(year) : undefined,
+        buyPrice: buyPrice ? Number(buyPrice) : undefined,
+        sellPrice: sellPrice ? Number(sellPrice) : undefined,
+        // send ISO date strings (z.coerce.date will parse)
+        buyDate: buyDate || undefined,
+        sellDate: sellDate || undefined,
+        vin: vin ? vin.trim() : undefined,
+        status: status ?? undefined,
+        imgUrl: imgDataUrl ?? undefined,
+        notes: notes?.trim() ? notes.trim() : undefined,
       };
+
       if (accountId) body.accountId = accountId;
 
       const method = initial?.id ? "PUT" : "POST";
@@ -173,9 +211,28 @@ export default function CarForm({
         <div>
           <Label className="mb-1">Sell Price</Label>
           <Input
-            value={price}
-            onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))}
+            value={sellPrice}
+            onChange={(e) => setSellPrice(e.target.value.replace(/[^\d.]/g, ""))}
             placeholder="18000"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label className="mb-1">Buy Date</Label>
+          <Input
+            type="date"
+            value={buyDate}
+            onChange={(e) => setBuyDate(e.target.value)}
+          />
+        </div>
+        <div>
+          <Label className="mb-1">Sell Date</Label>
+          <Input
+            type="date"
+            value={sellDate}
+            onChange={(e) => setSellDate(e.target.value)}
           />
         </div>
       </div>
@@ -199,7 +256,11 @@ export default function CarForm({
 
       <div>
         <Label className="mb-1">Notes</Label>
-        <Textarea placeholder="Optional notes..." />
+        <Textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Optional notes..."
+        />
       </div>
 
       <div>

@@ -46,7 +46,7 @@ export async function PUT(
   req: Request,
   { params }: { params: { id: string } }
 ) {
-  const idParsed = idParamSchema.safeParse(params);
+  const idParsed = idParamSchema.safeParse(await params);
   if (!idParsed.success) {
     return NextResponse.json(
       { error: "Invalid car id", issues: idParsed.error.issues },
@@ -84,7 +84,7 @@ export async function DELETE(
   _req: Request,
   { params }: { params: { id: string } }
 ) {
-  const parsed = idParamSchema.safeParse(params);
+  const parsed = idParamSchema.safeParse(await params);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid car id", issues: parsed.error.issues },

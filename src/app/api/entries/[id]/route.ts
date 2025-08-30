@@ -40,7 +40,7 @@ export async function PUT(
 ) {
   try {
     // ✅ Validate id
-    const idParsed = idParamSchema.safeParse(params);
+    const idParsed = idParamSchema.safeParse(await params);
     if (!idParsed.success) {
       return NextResponse.json(
         { error: "Invalid entry id", issues: idParsed.error.issues },

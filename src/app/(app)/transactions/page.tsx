@@ -3,7 +3,6 @@ import EntriesClient from "@/components/transactions/TransactionsClient";
 import React from "react";
 import { getAuthSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import BalanceWidget from "@/components/BalanceWidget";
 
 export default async function EntriesPage() {
   const session = await getAuthSession();
